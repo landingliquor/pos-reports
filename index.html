@@ -2,23 +2,167 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Store Reports</title>
+  <title>Landing Liquor Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; background:#0b1220; color:#e9eefc; padding:40px }
-    a { color:#9ec5fe; font-size:18px }
-    .box { background:#121a2b; padding:20px; border-radius:8px; width:320px }
-    h2 { margin-top:0 }
+    body { font-family: Arial, sans-serif; background:#0b1220; color:#e9eefc; margin:0; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 22px; }
+    .card { background:#121a2b; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px; }
+    .row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+    .muted { color:rgba(233,238,252,.72); font-size:14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    label { display:block; margin-bottom:6px; font-size:13px; color:rgba(233,238,252,.72); }
+    input[type="date"], select {
+      padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,.15);
+      background:#0e1626; color:#e9eefc; min-width: 220px;
+    }
+    button {
+      padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.15);
+      background:#1b4fd6; color:#fff; cursor:pointer;
+    }
+    button.secondary { background:#24314a; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .pill { display:inline-block; padding:.2rem .6rem; border:1px solid rgba(255,255,255,.14); border-radius:999px; font-size:12px; }
+    .top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .viewer { margin-top:14px; }
+    iframe {
+      width: 100%;
+      height: calc(100vh - 230px);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 12px;
+      background: #0e1626;
+    }
+    .alert {
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+    }
+    .tabs { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
   </style>
 </head>
+
 <body>
-  <div class="box">
-    <h2>Store Reports</h2>
-    <ul>
-      <li><a href="summary_daily.html" target="_blank">Summary Report Daily</a></li>
-      <li><a href="category_report.html" target="_blank">Category Report</a></li>
-      <li><a href="onhand.html" target="_blank">Onhand Report</a></li>
-    </ul>
-    <small>Updated daily from POS</small>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <div>
+          <h2 style="margin:0;">Store Reports</h2>
+          <div class="muted">Pick a date → view report → export to Excel</div>
+        </div>
+        <div class="pill mono" id="latestPill">latest: —</div>
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <div>
+          <label>Choose date</label>
+          <input id="datePicker" type="date" />
+        </div>
+
+        <div style="flex:1; min-width: 260px;">
+          <label>Report</label>
+          <select id="reportSelect">
+            <option value="summary_daily.html">Daily Summary</option>
+            <option value="category_report.html">Category Report</option>
+          </select>
+        </div>
+
+        <div><button id="loadBtn">Load</button></div>
+        <div><button class="secondary" id="fullBtn">Fullscreen</button></div>
+        <div><button class="secondary" id="xlsBtn">Download Excel</button></div>
+      </div>
+
+      <div class="tabs">
+        <span class="pill mono" id="selectedInfo">selected: —</span>
+        <span class="pill mono" id="updatedInfo">updated: —</span>
+      </div>
+
+      <div id="msg" class="alert muted" style="display:none;"></div>
+    </div>
+
+    <div class="viewer">
+      <iframe id="viewer" src="about:blank"></iframe>
+    </div>
   </div>
+
+<script>
+  const datePicker   = document.getElementById("datePicker");
+  const reportSelect = document.getElementById("reportSelect");
+  const loadBtn      = document.getElementById("loadBtn");
+  const fullBtn      = document.getElementById("fullBtn");
+  const xlsBtn       = document.getElementById("xlsBtn");
+  const viewer       = document.getElementById("viewer");
+
+  const latestPill   = document.getElementById("latestPill");
+  const selectedInfo = document.getElementById("selectedInfo");
+  const updatedInfo  = document.getElementById("updatedInfo");
+  const msg          = document.getElementById("msg");
+
+  let availableDates = new Set();
+  let latestDate = null;
+
+  function showMsg(text) {
+    msg.style.display = "block";
+    msg.textContent = text;
+  }
+  function hideMsg() {
+    msg.style.display = "none";
+  }
+
+  function setSelectedInfo() {
+    selectedInfo.textContent = `selected: ${datePicker.value || "—"} | ${reportSelect.value}`;
+  }
+
+  function clamp() {
+    const ok = datePicker.value && availableDates.has(datePicker.value);
+    loadBtn.disabled = !ok;
+    fullBtn.disabled = !ok;
+    xlsBtn.disabled  = !ok;
+  }
+
+  function loadReport() {
+    hideMsg();
+    if (!availableDates.has(datePicker.value)) {
+      showMsg("Report not available for this date.");
+      return;
+    }
+    viewer.src = `reports/${datePicker.value}/${reportSelect.value}`;
+    setSelectedInfo();
+  }
+
+  function fullscreen() {
+    window.open(`reports/${datePicker.value}/${reportSelect.value}`, "_blank");
+  }
+
+  function downloadExcel() {
+    const xls = reportSelect.value.replace(".html", ".xlsx");
+    window.open(`reports/${datePicker.value}/${xls}`, "_blank");
+  }
+
+  fetch("report_index.json", { cache: "no-store" })
+    .then(r => r.json())
+    .then(j => {
+      j.dates.forEach(d => availableDates.add(d));
+      latestDate = j.latest;
+      latestPill.textContent = "latest: " + latestDate;
+      updatedInfo.textContent = "updated: " + j.updated_at;
+
+      const sorted = [...availableDates].sort();
+      datePicker.min = sorted[0];
+      datePicker.max = sorted[sorted.length - 1];
+      datePicker.value = latestDate;
+
+      clamp();
+      viewer.src = `reports/${latestDate}/${reportSelect.value}`;
+      setSelectedInfo();
+    });
+
+  datePicker.addEventListener("change", clamp);
+  reportSelect.addEventListener("change", setSelectedInfo);
+  loadBtn.addEventListener("click", loadReport);
+  fullBtn.addEventListener("click", fullscreen);
+  xlsBtn.addEventListener("click", downloadExcel);
+</script>
 </body>
 </html>
